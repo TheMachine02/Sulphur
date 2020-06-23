@@ -133,11 +133,11 @@ include 'sulphur_certificate.asm'
 	jp	(iy)
 	jp	(ix)
 	
-include	'init.asm'
-include	'leaf.asm'
-include	'lz4.asm'
-include	'vfat.asm'
-include	'usb.asm'
+include	'src/init.asm'
+include	'src/leaf.asm'
+include	'src/lz4.asm'
+include	'src/vfat.asm'
+include	'src/usb.asm'
 
 if $ > $030000
 	err 'Guilty βίος. Loader is too big !'

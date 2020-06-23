@@ -11,3 +11,6 @@ It also expose the partition as an usb mass storage (planned), allow multiple ke
 It should be pointed that it does make kernel execute in RAM (or it *could* in theory execute in flash, but it will be much more convoluted). That's not a real issue with a proprer file system support from the kernel, but you'll still need to keep the kernel size down if you don't want to clobber all the RAM. The side effect is also faster execution, which is definitely wanted.
 
 The kernel space *should* be in memory protected region for security (which is the boot heap).
+
+
+Logo from wikipedia common.
