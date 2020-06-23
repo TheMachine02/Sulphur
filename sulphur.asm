@@ -1,7 +1,6 @@
 include	'include/ez80.inc'
 include	'include/tiformat.inc'
 include	'include/ti84pce.inc'
-include	'include/leaf.inc'
 
 format	ti executable 'SULPHUR'
 

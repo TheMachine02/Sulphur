@@ -12,7 +12,7 @@ init:
 ; 	call	vfat.file_copy
 
 ; in place decompress the file @D3
-	ld	hl, $D30000
+	ld	hl, $030A00
 	ld	de, $D30000
 	call	lz4.decompress
 	
