@@ -1,6 +1,7 @@
 include	'include/ez80.inc'
 include	'include/tiformat.inc'
 include	'include/ti84pce.inc'
+include	'include/leaf.inc'
 
 format	ti executable 'SULPHUR'
 
@@ -134,9 +135,10 @@ include 'sulphur_certificate.asm'
 	jp	(ix)
 	
 include	'init.asm'
-;include	'leaf.asm'
+include	'leaf.asm'
 include	'lz4.asm'
-;include	'vfat12.asm'
+include	'vfat.asm'
+include	'usb.asm'
 
 if $ > $030000
 	err 'Guilty βίος. Loader is too big !'
