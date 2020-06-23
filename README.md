@@ -1,7 +1,7 @@
 # Sulphur
 
 <p align="center">
-<img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Sulfur-sample.jpg" />
+<img src="https://i.imgur.com/BOHC1Em.png" />
 </p>
 
 Sulphur is a stage 2 boot loader designed to be used with sorcery kernel. It create a vfat boot partition and use it to load the kernel as a leaf executable file, then pass hand to kernel.
