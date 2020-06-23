@@ -3,7 +3,7 @@ include 'include/asm-leaf.inc'
 
 LEAF.settings.flags = LF_STATIC
 
-virtual	$D10000
+org $D00100
 section '.text' executable
 entry loop
 loop:
@@ -56,7 +56,7 @@ crc16_dnp:
 	ld	e, a
 	ret
 
-virtual	$D00000
+org	$D10000
 section '.bss' writeable
 free:
 rb	8192
@@ -68,6 +68,7 @@ example2:
  db	0xA5, 0x5A, 0x42, 0x42	; 0xDDC5
  dl 3
  
+org	$D20000
 section '.rodata' readable
 crc16_dnp_table:
  dw	0x0000, 0x365e, 0x6cbc, 0x5ae2, 0xd978, 0xef26, 0xb5c4, 0x839a

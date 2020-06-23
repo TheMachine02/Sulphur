@@ -236,15 +236,6 @@ macro entry? address*
 	end namespace
 end macro
 
-macro virtual? address*
-	namespace LEAF
-	if FLAGS = LF_REALLOC
-		err 'Can't use virtual for realloc programme.'
-	end if
-	end namespace
-	org address
-end macro
-
 macro section?
 	namespace LEAF
 
