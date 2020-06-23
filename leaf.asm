@@ -34,5 +34,9 @@ leaf:
 	and	LF_STATIC
 	ret	z
 ; execute in place
+; we need to reallocate here
+; read section table and copy at correct location (for those needed)
+
+
 	ld	hl, (iy+LEAF_HEADER_ENTRY)
 	jp	(hl)

@@ -8,16 +8,16 @@ init:
 ; 	ld	hl, $030000
 ; 	call	vfat.mount
 ; 	ld	hl, .file_name
-; 	call	vfat.open
-; 	ld	de, $D00000
-; 	ld	bc, 65536
-; 	call	vfat.read
-	
-	ld	hl, $D00000
-	ld	de, $D00000
+; 	ld	de, $D30000
+; 	call	vfat.file_copy
+
+; in place decompress the file @D3
+	ld	hl, $D30000
+	ld	de, $D30000
 	call	lz4.decompress
 	
-	ld	iy, $D00000
+	ld	iy, $D30000
+; and load it
 	call	leaf.exec_static	; should not return
 	rst	$00
 	
