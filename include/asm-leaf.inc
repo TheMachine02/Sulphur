@@ -163,7 +163,7 @@ namespace LEAF
 	e_type		db LT_EXEC
 	e_machine	db MACHINE
 	e_flags		db FLAGS
-	e_entry 	dl 0
+	e_entry 	dl GLOBAL_ENTRY
 	e_shoff 	dl SECTION_TABLE_OFFSET
 	e_shnum 	db NUMBER_OF_SECTIONS
 	e_shstrndx	db STRING_TABLE_SECTION_INDEX
@@ -222,6 +222,7 @@ namespace LEAF
 		SECTION_STATIC_BASE=$
 		org SECTION_STATIC_BASE
 	end if
+	GLOBAL_ENTRY:
 	
 end namespace
 

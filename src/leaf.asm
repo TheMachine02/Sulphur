@@ -102,6 +102,9 @@ define	R_Z80_BYTE3		10
 define	R_Z80_WORD0		11
 define	R_Z80_WORD1		12
 
+define	leaf_bound_lower	$D0000A
+define	leaf_bound_upper	$D0000D
+
 leaf:
  
 .exec_static:
@@ -165,8 +168,50 @@ leaf:
 .alloc_next_section:
 	lea	ix, ix+16
 	pop	bc
-	djnz	.alloc_prog_loop
+	djnz	.alloc_prog_loop	
+	call	.bound_static
+.priviligied_static:
+	ld	hl, leaf_bound_lower
+	ld	bc, $620
+	otimr
 ; load up entry
 ; and jump !
 	ld	hl, (iy+LEAF_HEADER_ENTRY)
 	jp	(hl)
+
+.bound_static:
+; find execution bound for a static program
+	ld	hl, $D00000
+	ld	(leaf_bound_lower), hl
+	ld	(leaf_bound_upper), hl
+	lea	bc, iy+0
+	ld	ix, (iy+LEAF_HEADER_SHOFF)
+	add	ix, bc
+; read section now
+	ld	b, (iy+LEAF_HEADER_SHNUM)
+.bound_loop:
+	push	bc
+	ld	a, (ix+LEAF_SECTION_FLAGS)
+	and	a, SHF_ALLOC
+	jr	z, .bound_not_in
+	ld	de, (ix+LEAF_SECTION_ADDR)
+	ld	hl, (leaf_bound_lower)
+	or	a, a
+	sbc	hl, de
+	jr	c, .bound_upper
+	ld	(leaf_bound_lower), de
+.bound_upper:
+	ld	hl, (ix+LEAF_SECTION_SIZE)
+	add	hl, de
+	ex	de, hl
+	ld	hl, (leaf_bound_upper)
+	or	a, a
+	sbc	hl, de
+	jr	nc, .bound_lower
+	ld	(leaf_bound_upper), de
+.bound_lower:
+.bound_not_in:
+	lea	ix, ix+16
+	pop	bc
+	djnz	.bound_loop
+	ret
