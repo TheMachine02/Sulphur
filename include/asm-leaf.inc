@@ -28,7 +28,6 @@ end struct
 struct Leaf24_Sym
 	st_name 	rl 1
 	st_value	rl 1
-	st_size 	rl 1
 	st_info 	rb 1
 	st_shndx	rb 1
 end struct
@@ -65,21 +64,20 @@ define	LEAF_SECTION_FLAGS	4	; flags, 1 byte
 define	LEAF_SECTION_ADDR	5	; virtual adress
 define	LEAF_SECTION_OFFSET	8	; offset in file 
 define	LEAF_SECTION_SIZE	11	; size of the section
-define	LEAF_SECTION_LINK	14	; link to an other section (for rel section)
+define	LEAF_SECTION_INFO	14	; link to an other section (for rel section)
 define	LEAF_SECTION_PAD	15	; pad to 16 bytes
 
 ; relocation, 6 bytes ;
 define	LEAF_REL		0
-define	LEAF_REL_OFFSET		0		; offset within section of the data to realloc
-define	LEAF_REL_INFO		3		; more info (symbol index)
+define	LEAF_REL_OFFSET		0	; offset within section of the data to realloc (rel section are section defined with INFO
+define	LEAF_REL_INFO		3	; more info (symbol index)
 
-; symbol structure, 11 bytes
+; symbol structure, 8 bytes
 define	LEAF_SYMBOL		0
 define	LEAF_SYMBOL_NAME	0	; 3 bytes, index is str table
-define	LEAF_SYMBOL_VALUE	3	; 3 bytes
-define	LEAF_SYMBOL_SIZE	6	; 3 bytes
-define	LEAF_SYMBOL_INFO	9	; 1 byte
-define	LEAF_SYMBOL_SHNDX	10	; 1 bytes, section index
+define	LEAF_SYMBOL_VALUE	3	; 3 bytes, value : either 0 or offset in section
+define	LEAF_SYMBOL_INFO	6	; 1 byte, type (func, global etc)
+define	LEAF_SYMBOL_SHNDX	7	; 1 bytes, section index, 0 is UNDEF, 0xFF is SHN_ABS
 
 ;define	LEAF_ST_BIND(INFO)	((INFO) >> 4)
 ;define	LEAF_ST_TYPE(INFO)	((INFO) & $0F)
@@ -117,6 +115,7 @@ define	SHF_EXECINSTR		$4
 
 ; special section indexes
 define	SHN_UNDEF		0
+define	SHN_ABS			0xFF
 
 define	STB_LOCAL		0
 define	STB_GLOBAL		1
@@ -147,23 +146,32 @@ R_Z80_WORD1	= 12
 LEAF::
 
 namespace LEAF
-	DYNAMIC := 0
-	
-	MACHINE := LM_EZ80_ADL
-
+	if	defined LEAF.settings.machine
+		MACHINE := LEAF.settings.machine
+	else
+		MACHINE := LM_EZ80_ADL
+		assume ADL = 1
+	end if
+		
 	if	defined LEAF.settings.flags
-		FLAGS = LEAF.settings.flags
+		FLAGS := LEAF.settings.flags
 	else
 		FLAGS := LF_REALLOC
+	end if
+	
+	if	defined	LEAF.settings.type
+		TYPE := LEAF.settings.type
+	else
+		TYPE := LT_EXEC
 	end if
 	
 	Header:
 
 	e_ident 	db 0x7F,'LEAF'
-	e_type		db LT_EXEC
+	e_type		db TYPE
 	e_machine	db MACHINE
 	e_flags		db FLAGS
-	e_entry 	dl GLOBAL_ENTRY
+	e_entry 	dl 0
 	e_shoff 	dl SECTION_TABLE_OFFSET
 	e_shnum 	db NUMBER_OF_SECTIONS
 	e_shstrndx	db STRING_TABLE_SECTION_INDEX
@@ -209,7 +217,6 @@ namespace LEAF
 	SYMBOL_INDEX = NUMBER_OF_SECTION_SYMBOLS
 
 	SECTION_OFFSET = $%
-	SECTION_ALIGN = 1
 	SECTION_NAME = '.flat'
 	SECTION_FLAGS = SHF_ALLOC + SHF_WRITE + SHF_EXECINSTR
 	DEFINED_SECTION = 0
@@ -222,15 +229,36 @@ namespace LEAF
 		SECTION_STATIC_BASE=$
 		org SECTION_STATIC_BASE
 	end if
-	GLOBAL_ENTRY:
 	
 end namespace
 
 macro entry? address*
-	; store the section entry if not virtual
+	; store the symbol entry if not virtual
 	namespace LEAF
 		if LEAF.FLAGS = LF_REALLOC
-			store (0 scaleof (1 metadataof address)) at LEAF:e_entry
+			
+		match value =as? str, address
+			SYMBOL_VALUE = value
+			SYMBOL_NAME = string str
+		else
+			SYMBOL_VALUE = address
+			SYMBOL_NAME = `address
+		end match
+
+		if SYMBOL_VALUE relativeto 1 elementof SYMBOL_VALUE & 1 elementof (1 metadataof SYMBOL_VALUE) relativeto relocatable & 1 scaleof (1 metadataof SYMBOL_VALUE) > 0
+			SYMBOL_SECTION_INDEX = 1 scaleof (1 metadataof SYMBOL_VALUE)
+			SYMBOL_VALUE = SYMBOL_VALUE - 1 elementof SYMBOL_VALUE
+		else
+			SYMBOL_SECTION_INDEX = SHN_ABS
+		end if
+		store STRING_POSITION at symbol_table : Leaf24_Sym.st_name + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SYMBOL_NAME : lengthof SYMBOL_NAME at string_table:STRING_POSITION
+		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
+		store SYMBOL_VALUE at symbol_table : Leaf24_Sym.st_value + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SYMBOL_SECTION_INDEX at symbol_table : Leaf24_Sym.st_shndx + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store STT_FUNC + STB_GLOBAL shl 4 at symbol_table : Leaf24_Sym.st_info + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SYMBOL_INDEX at LEAF:e_entry
+		SYMBOL_INDEX = SYMBOL_INDEX + 1
 		else
 			store address at LEAF:e_entry
 		end if
@@ -261,6 +289,7 @@ macro section?
 				db UNINITIALIZED_LENGTH dup 0
 			end if
 
+			store 0 at symbol_table : Leaf24_Sym.st_value + SECTION_SYMBOL_INDEX * sizeof Leaf24_Sym
 			store SECTION_INDEX at symbol_table : Leaf24_Sym.st_shndx + SECTION_SYMBOL_INDEX * sizeof Leaf24_Sym
 			store STT_SECTION + STB_LOCAL shl 4 at symbol_table : Leaf24_Sym.st_info + SECTION_SYMBOL_INDEX * sizeof Leaf24_Sym
 
@@ -361,18 +390,6 @@ macro section? declaration*
 	end namespace
 end macro
 
-calminstruction align? boundary,value:?
-	check	LEAF.SECTION_ALIGN mod (boundary) = 0
-	jyes	allowed
-	arrange value, =err 'section not aligned enough'
-	assemble value
-	exit
-    allowed:
-	compute boundary, (boundary-1)-($-LEAF.SECTION_BASE+boundary-1) mod boundary
-	arrange value, =db boundary =dup value
-	assemble value
-end calminstruction
-
 macro public? declaration*
 	namespace LEAF
 		match value =as? str, declaration
@@ -392,51 +409,50 @@ macro public? declaration*
 		end if
 		store STRING_POSITION at symbol_table : Leaf24_Sym.st_name + SYMBOL_INDEX * sizeof Leaf24_Sym
 		store SYMBOL_NAME : lengthof SYMBOL_NAME at string_table:STRING_POSITION
-		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
 		store SYMBOL_VALUE at symbol_table : Leaf24_Sym.st_value + SYMBOL_INDEX * sizeof Leaf24_Sym
-		store SYMBOL_SIZE at symbol_table : Leaf24_Sym.st_size + SYMBOL_INDEX * sizeof Leaf24_Sym
 		store SYMBOL_SECTION_INDEX at symbol_table : Leaf24_Sym.st_shndx + SYMBOL_INDEX * sizeof Leaf24_Sym
 		if SYMBOL_SIZE
 			store STT_OBJECT + STB_GLOBAL shl 4 at symbol_table : Leaf24_Sym.st_info + SYMBOL_INDEX * sizeof Leaf24_Sym
 		else
 			store STT_FUNC + STB_GLOBAL shl 4 at symbol_table : Leaf24_Sym.st_info + SYMBOL_INDEX * sizeof Leaf24_Sym
 		end if
+		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
 		SYMBOL_INDEX = SYMBOL_INDEX + 1
 	end namespace
 end macro
 
 macro extern? declaration*
 	namespace LEAF
-		local sym,psym
-		element sym : relocatable * (-1) + SYMBOL_INDEX
-		element psym : PLT + SYMBOL_INDEX
-		match str =as? name:size, declaration
-			label name:size at sym
-			label PLT.name at psym
-			SYMBOL_NAME = string str
-			SYMBOL_SIZE = size
-		else match name:size, declaration
-			label name:size at sym
-			label PLT.name at psym
-			SYMBOL_NAME = `name
-			SYMBOL_SIZE = size
-		else match str =as? name, declaration
-			label name at sym
-			label PLT.name at psym
-			SYMBOL_NAME = string str
-			SYMBOL_SIZE = 0
-		else
-			label declaration at sym
-			label PLT.declaration at psym
-			SYMBOL_NAME = `declaration
-			SYMBOL_SIZE = 0
-		end match
+		if ~definite declaration
+		label declaration
+		SYMBOL_NAME = `declaration
 		store STRING_POSITION at symbol_table : Leaf24_Sym.st_name + SYMBOL_INDEX * sizeof Leaf24_Sym
 		store SYMBOL_NAME : lengthof SYMBOL_NAME at string_table:STRING_POSITION
-		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
-		store SYMBOL_SIZE at symbol_table : Leaf24_Sym.st_size + SYMBOL_INDEX * sizeof Leaf24_Sym
 		store STT_NOTYPE + STB_GLOBAL shl 4 at symbol_table : Leaf24_Sym.st_info + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store 0 at symbol_table : Leaf24_Sym.st_value + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SHN_UNDEF at symbol_table : Leaf24_Sym.st_shndx + SYMBOL_INDEX * sizeof Leaf24_Sym
+		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
 		SYMBOL_INDEX = SYMBOL_INDEX + 1
+		end if
+	end namespace
+end macro
+
+macro private? address*
+end macro
+
+macro static? declaration*
+	namespace LEAF
+	match name address, declaration
+		label name
+		SYMBOL_NAME = `name
+		store STRING_POSITION at symbol_table : Leaf24_Sym.st_name + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SYMBOL_NAME : lengthof SYMBOL_NAME at string_table:STRING_POSITION
+		store STT_FUNC + STB_GLOBAL shl 4 at symbol_table : Leaf24_Sym.st_info + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store address at symbol_table : Leaf24_Sym.st_value + SYMBOL_INDEX * sizeof Leaf24_Sym
+		store SHN_ABS at symbol_table : Leaf24_Sym.st_shndx + SYMBOL_INDEX * sizeof Leaf24_Sym
+		STRING_POSITION = STRING_POSITION + lengthof SYMBOL_NAME + 1
+		SYMBOL_INDEX = SYMBOL_INDEX + 1
+	end match
 	end namespace
 end macro
 
